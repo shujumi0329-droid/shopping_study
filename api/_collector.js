@@ -1,5 +1,5 @@
 export const COLLECTOR_URL = String(process.env.SHOPPING_COLLECTOR_URL || '').trim();
-export const STUDY_VERSION = 'shopping-v7-queue-2026-08-25';
+export const STUDY_VERSION = 'shopping-v9-survey-return-2026-09-01';
 export const MIN_COUNT = 1;
 export const MAX_COUNT = 7;
 
