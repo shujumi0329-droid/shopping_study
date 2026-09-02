@@ -1,4 +1,5 @@
-export const COLLECTOR_URL = String(process.env.SHOPPING_COLLECTOR_URL || '').trim();
+const DEFAULT_COLLECTOR_URL = 'https://script.google.com/macros/s/AKfycbzha7_C5tjRUYqLYa-DFSqkeRkuCjrhEKzk3khdrlir3SBkgwMtWn9qjqqtrb47Xw/exec';
+export const COLLECTOR_URL = String(process.env.SHOPPING_COLLECTOR_URL || DEFAULT_COLLECTOR_URL).trim();
 export const STUDY_VERSION = 'shopping-v9-survey-return-2026-09-01';
 export const MIN_COUNT = 1;
 export const MAX_COUNT = 7;
