@@ -28,17 +28,5 @@
         }
       ]
     }
-  ],
-  "functions": {
-    "api/queue-collector.js": {
-      "experimentalTriggers": [
-        {
-          "type": "queue/v2beta",
-          "topic": "shopping-events",
-          "retryAfterSeconds": 15,
-          "initialDelaySeconds": 0
-        }
-      ]
-    }
-  }
+  ]
 }
