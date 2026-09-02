@@ -1,5 +1,4 @@
-import { send } from '@vercel/queue';
-import { json, STUDY_VERSION, MIN_COUNT, MAX_COUNT } from './_collector.js';
+import { collectorPost, json, STUDY_VERSION, MIN_COUNT, MAX_COUNT } from './_collector.js';
 
 const EVENTS = new Set(['OPEN','ADD','REMOVE','PAGE','CONTINUE','SURVEY_COMPLETE']);
 const PRODUCT_RE = /^P(?:0[1-9]|1[0-9]|2[0-4])$/;
@@ -33,18 +32,13 @@ export default async function handler(req, res) {
       selected_count: selectedCount, selected_items: uniqueItems.join(','), selection_order: safeText(d.selection_order, 500),
       elapsed_ms: Math.max(0, Number(d.elapsed_ms || 0)), study_version: STUDY_VERSION,
       client_time: safeText(d.client_time, 80), user_agent: safeText(d.user_agent, 1000), referrer: safeText(d.referrer, 1000),
-      extra_json: safeText(d.extra_json, 5000), selected_total_usd: Math.max(0, Number(d.selected_total_usd || 0)),
-      queued_at: new Date().toISOString()
+      extra_json: safeText(d.extra_json, 5000), selected_total_usd: Math.max(0, Number(d.selected_total_usd || 0))
     };
 
-    const { messageId } = await send('shopping-events', payload, {
-      idempotencyKey: eventId,
-      retentionSeconds: 86400
-    });
-
-    return json(res, 202, { ok: true, queued: true, event_id: eventId, message_id: messageId });
+    await collectorPost(payload);
+    return json(res, 200, { ok: true, event_id: eventId });
   } catch (error) {
-    console.error('event enqueue failed', error);
-    return json(res, 503, { ok: false, error: 'Event could not be queued' });
+    console.error('event delivery failed', error);
+    return json(res, 503, { ok: false, error: 'Event could not be saved' });
   }
 }
