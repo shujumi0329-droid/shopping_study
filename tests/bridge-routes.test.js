@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { makeStartHandler } from '../api/start.js';
 import { makeTestHandler } from '../api/test.js';
 import sessionHandler from '../api/session.js';
-import { signBridgeSession, serializeBridgeCookie } from '../api/_bridge.js';
+import { signBridgeSession, serializeBridgeCookie, deriveInternalTestToken } from '../api/_bridge.js';
 
 function resMock(){
   return {
@@ -81,4 +81,14 @@ test('/api/session reports linked and unlinked state',async()=>{
     assert.equal(linked.body.run_mode,'internal');
     assert.equal(linked.body.join_id,'TEST_ABCDEF1234567890ABCDEF12');
   } finally { if(old===undefined) delete process.env.BRIDGE_SIGNING_SECRET; else process.env.BRIDGE_SIGNING_SECRET=old; }
+});
+
+test('/test derives a stable internal token when explicit env token is unavailable',async()=>{
+  const writes=[];
+  const expected=deriveInternalTestToken('s');
+  const h=makeTestHandler({collectorGetImpl:configOk,collectorPostImpl:async p=>writes.push(p),secret:'s',internalToken:''});
+  const res=resMock();
+  await h({method:'GET',query:{access:expected},headers:{}},res);
+  assert.equal(res.statusCode,302);
+  assert.equal(writes[0].run_mode,'internal');
 });
