@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { makeStartHandler } from '../api/start.js';
 import { makeTestHandler } from '../api/test.js';
-import sessionHandler from '../api/session.js';
+import { makeSessionHandler } from '../api/session.js';
 import { signBridgeSession, serializeBridgeCookie, deriveInternalTestToken } from '../api/_bridge.js';
 
 function resMock(){
@@ -47,6 +47,7 @@ test('/start classifies MTurk preview separately',async()=>{
   await h({method:'GET',query:{assignmentId:'ASSIGNMENT_ID_NOT_AVAILABLE'},headers:{}},res);
   assert.equal(res.statusCode,302);
   assert.equal(writes[0].run_mode,'preview');
+  assert.equal(res.body,undefined);
   assert.equal(writes[0].recruitment_source,'mturk_preview');
   assert.match(writes[0].join_id,/^PREVIEW_/);
 });
@@ -66,17 +67,36 @@ test('/test rejects invalid access and creates internal bridge for valid access'
   assert.match(writes[0].join_id,/^TEST_/);
 });
 
-test('/api/session reports linked and unlinked state',async()=>{
-  const unlinked=resMock();
-  await sessionHandler({method:'GET',headers:{}},unlinked);
-  assert.deepEqual(unlinked.body,{ok:true,linked:false});
+test('/api/session automatically creates an internal TEST session when no bridge exists',async()=>{
+  const writes=[];
+  const h=makeSessionHandler({
+    collectorPostImpl:async p=>{writes.push(p);return {ok:true}},
+    readBridgeSessionImpl:()=>null,
+    createRandomJoinIdImpl:()=> 'TEST_AUTOMATIC123456789012',
+    signBridgeSessionImpl:()=> 'signed-token',
+    serializeBridgeCookieImpl:token=>`shopping_bridge=${token}; Path=/; HttpOnly; Secure; SameSite=Lax`
+  });
+  const res=resMock();
+  await h({method:'GET',headers:{}},res);
+  assert.equal(res.statusCode,200);
+  assert.equal(res.body.linked,true);
+  assert.equal(res.body.run_mode,'internal');
+  assert.equal(res.body.recruitment_source,'internal_test');
+  assert.equal(res.body.join_id,'TEST_AUTOMATIC123456789012');
+  assert.match(String(res.headers['set-cookie']),/shopping_bridge=signed-token/);
+  assert.equal(writes.length,1);
+  assert.equal(writes[0].event_type,'BRIDGE_START');
+  assert.equal(writes[0].run_mode,'internal');
+});
 
+test('/api/session preserves an existing signed bridge identity',async()=>{
   const old=process.env.BRIDGE_SIGNING_SECRET;
   process.env.BRIDGE_SIGNING_SECRET='secret';
   try{
     const token=signBridgeSession({join_id:'TEST_ABCDEF1234567890ABCDEF12',run_mode:'internal',recruitment_source:'internal_test'},'secret');
+    const h=makeSessionHandler();
     const linked=resMock();
-    await sessionHandler({method:'GET',headers:{cookie:serializeBridgeCookie(token,21600).split(';')[0]}},linked);
+    await h({method:'GET',headers:{cookie:serializeBridgeCookie(token,21600).split(';')[0]}},linked);
     assert.equal(linked.body.linked,true);
     assert.equal(linked.body.run_mode,'internal');
     assert.equal(linked.body.join_id,'TEST_ABCDEF1234567890ABCDEF12');
