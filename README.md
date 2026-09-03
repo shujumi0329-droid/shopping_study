@@ -25,6 +25,8 @@ Set these values outside the repository:
 - Google Apps Script property `ADMIN_PASSWORD` — researcher password used by the hidden settings panel
 - Google Apps Script property `SPREADSHEET_ID` — destination study spreadsheet
 
+If `BRIDGE_SIGNING_SECRET` or `INTERNAL_TEST_TOKEN` is not configured, the deployment has a **Vercel system identity fallback** so the bridge remains operational: the signing key is deterministically derived server-side from Vercel's project system identity, and the internal test token is derived from that key. Explicit high-entropy environment variables remain the preferred hardening option; the fallback exists so pre-launch testing is not blocked by environment-variable provisioning.
+
 The Vercel app no longer stores a separate administrator-password hash. Researcher authentication is delegated to the Google Apps Script collector, so there is a single password authority.
 
 ## Event delivery
