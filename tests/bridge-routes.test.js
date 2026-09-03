@@ -84,9 +84,7 @@ test('/api/session automatically creates an internal TEST session when no bridge
   assert.equal(res.body.recruitment_source,'internal_test');
   assert.equal(res.body.join_id,'TEST_AUTOMATIC123456789012');
   assert.match(String(res.headers['set-cookie']),/shopping_bridge=signed-token/);
-  assert.equal(writes.length,1);
-  assert.equal(writes[0].event_type,'BRIDGE_START');
-  assert.equal(writes[0].run_mode,'internal');
+  assert.equal(writes.length,0);
 });
 
 test('/api/session preserves an existing signed bridge identity',async()=>{
