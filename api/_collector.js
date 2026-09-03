@@ -39,3 +39,33 @@ export function json(res, status, body) {
   res.setHeader('cache-control', 'no-store');
   return res.json(body);
 }
+
+export async function persistBridgeStart(session, collectorPostImpl = collectorPost) {
+  const modeMeta = {
+    bridge_start: true,
+    run_mode: session.run_mode,
+    recruitment_source: session.recruitment_source
+  };
+  return collectorPostImpl({
+    action: 'BRIDGE_START',
+    event_type: 'BRIDGE_START',
+    event_id: `bridge-${session.join_id}-${Date.now()}`,
+    join_id: session.join_id,
+    session_id: '',
+    assignment_id: session.assignment_id || '',
+    worker_id: session.worker_id || '',
+    hit_id: session.hit_id || '',
+    run_mode: session.run_mode,
+    recruitment_source: session.recruitment_source,
+    selected_count: 0,
+    selected_items: '',
+    selection_order: '',
+    selected_total_usd: 0,
+    elapsed_ms: 0,
+    study_version: STUDY_VERSION,
+    client_time: new Date().toISOString(),
+    user_agent: '',
+    referrer: '',
+    extra_json: JSON.stringify(modeMeta)
+  });
+}
