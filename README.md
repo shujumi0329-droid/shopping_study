@@ -20,6 +20,8 @@ Do not commit researcher passwords or spreadsheet identifiers.
 Set these values outside the repository:
 
 - Vercel environment variable `SHOPPING_COLLECTOR_URL` — the deployed Google Apps Script web-app `/exec` URL
+- Vercel environment variable `BRIDGE_SIGNING_SECRET` — high-entropy secret used to derive production join IDs and sign bridge cookies
+- Vercel environment variable `INTERNAL_TEST_TOKEN` — private token authorizing the internal `/test` entry
 - Google Apps Script property `ADMIN_PASSWORD` — researcher password used by the hidden settings panel
 - Google Apps Script property `SPREADSHEET_ID` — destination study spreadsheet
 
@@ -41,3 +43,16 @@ The participant page preserves the existing SurveyCake session whenever possible
 ## Deployment notes
 
 Deploy this repository as a Vercel project and set `SHOPPING_COLLECTOR_URL` for the deployment environment. The root route and `/shopping-study` are rewritten to the current participant task. Configure the Google Apps Script web app and its access policy according to the study's participant-access requirements and institutional data-handling rules.
+
+## Identity bridge and entry URLs
+
+The study uses a server-authoritative bridge so MTurk identifiers do not have to survive SurveyCake URL forwarding. `/start` and `/test` must use the same canonical Vercel hostname as the Shopping link embedded in SurveyCake.
+
+- Production MTurk entry: `/start?assignmentId=...&workerId=...&hitId=...`
+- MTurk preview: `/start?assignmentId=ASSIGNMENT_ID_NOT_AVAILABLE` creates a `PREVIEW_...` session and never labels it production.
+- Internal pre-launch testing: `/test?access=<INTERNAL_TEST_TOKEN>` creates a `TEST_...` session and runs the same SurveyCake -> Shopping -> collector pipeline even before a HIT is live.
+- Direct Shopping access without a valid signed bridge cookie is blocked from normal research-event collection.
+
+Production records use `run_mode=production`; internal and preview records use `internal` and `preview`. When exporting for analysis, filter to `run_mode=production` (or, with the legacy deployed collector, the equivalent `ST_` join-ID prefix / run-mode value preserved in `extra_json`).
+
+The repository collector source supports a dedicated `Bridge_Sessions` sheet and explicit `run_mode`/`recruitment_source` columns. Bridge-start payloads remain backward-compatible with an older deployed Apps Script collector by also carrying `event_type=BRIDGE_START` plus run-mode metadata in `extra_json`.
