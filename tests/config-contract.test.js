@@ -20,6 +20,7 @@ test('operator docs cover bridge secrets and modes', () => {
     '/test',
     'ASSIGNMENT_ID_NOT_AVAILABLE',
     'same canonical Vercel hostname',
-    'run_mode=production'
+    'run_mode=production',
+    'Vercel system identity fallback'
   ]) assert.ok(readme.toLowerCase().includes(text.toLowerCase()), `missing ${text}`);
 });
