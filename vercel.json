@@ -2,6 +2,14 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
     {
+      "source": "/start",
+      "destination": "/api/start"
+    },
+    {
+      "source": "/test",
+      "destination": "/api/test"
+    },
+    {
       "source": "/",
       "destination": "/shopping-study-vercel/index.html"
     },
