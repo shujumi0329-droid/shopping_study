@@ -1,12 +1,13 @@
 import { collectorGet, collectorPost, persistBridgeStart, json } from './_collector.js';
-import { createRandomJoinId, signBridgeSession, serializeBridgeCookie } from './_bridge.js';
+import { createRandomJoinId, signBridgeSession, serializeBridgeCookie, deriveInternalTestToken } from './_bridge.js';
 
 function redirect(res,url){res.status(302);res.setHeader('Location',url);return res.end();}
 export function makeTestHandler({collectorGetImpl=collectorGet,collectorPostImpl=collectorPost,secret=process.env.BRIDGE_SIGNING_SECRET,internalToken=process.env.INTERNAL_TEST_TOKEN}={}){
   return async function handler(req,res){
     if(req.method!=='GET') return json(res,405,{ok:false,error:'Method not allowed'});
     const access=String(req.query?.access||'');
-    if(!internalToken || access!==internalToken) return json(res,403,{ok:false,error:'Invalid internal test access'});
+    const expectedToken=String(internalToken||deriveInternalTestToken(secret));
+    if(!access || access!==expectedToken) return json(res,403,{ok:false,error:'Invalid internal test access'});
     try{
       const session={join_id:createRandomJoinId('TEST'),run_mode:'internal',recruitment_source:'internal_test',assignment_id:'',worker_id:'',hit_id:''};
       const cfg=await collectorGetImpl({action:'config'});
