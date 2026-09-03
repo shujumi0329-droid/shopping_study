@@ -1,7 +1,8 @@
 const EVENT_SHEET = "Event_Log";
 const PARTICIPANT_SHEET = "Participants";
+const BRIDGE_SHEET = "Bridge_Sessions";
 const SETUP_SHEET = "Setup";
-const STUDY_VERSION = "shopping-v7-queue-2026-08-25";
+const STUDY_VERSION = "shopping-v9-survey-return-2026-09-01";
 
 function openStudySpreadsheet_() {
   const spreadsheetId = PropertiesService.getScriptProperties().getProperty("SPREADSHEET_ID");
@@ -45,11 +46,15 @@ function doPost(e) {
     if (data.action === "ADMIN_SET_SURVEY") {
       return handleAdminSetSurvey_(ss, data);
     }
+    if (data.action === "BRIDGE_START") {
+      return handleBridgeStart_(ss, data);
+    }
 
     if (!data.join_id || !data.event_type) throw new Error("Missing join_id/event_type");
     const ev = ss.getSheetByName(EVENT_SHEET);
     const ps = ss.getSheetByName(PARTICIPANT_SHEET);
     if (!ev || !ps) throw new Error("Event_Log or Participants sheet is missing");
+    ensureResearchHeaders_(ev, ps);
 
     if (data.event_id && eventExists_(ev, data.event_id)) {
       return json_({ok:true,duplicate:true});
@@ -61,7 +66,8 @@ function doPost(e) {
       data.assignment_id || "", data.worker_id || "", data.hit_id || "", data.event_type || "",
       data.product_id || "", data.page || "", data.selected_count || 0, data.selected_items || "",
       data.selection_order || "", data.elapsed_ms || 0, data.study_version || "", data.user_agent || "",
-      data.referrer || "", data.extra_json || "", Number(data.selected_total_usd || 0)
+      data.referrer || "", data.extra_json || "", Number(data.selected_total_usd || 0),
+      data.run_mode || "", data.recruitment_source || ""
     ]);
     upsertParticipant_(ps, data, now);
     return json_({ok:true});
@@ -70,6 +76,51 @@ function doPost(e) {
   } finally {
     lock.releaseLock();
   }
+}
+
+function ensureResearchHeaders_(eventSheet, participantSheet) {
+  eventSheet.getRange(1,21,1,2).setValues([["run_mode","recruitment_source"]]);
+  participantSheet.getRange(1,20,1,2).setValues([["run_mode","recruitment_source"]]);
+}
+
+function ensureBridgeSheet_(ss) {
+  let sheet = ss.getSheetByName(BRIDGE_SHEET);
+  if (!sheet) sheet = ss.insertSheet(BRIDGE_SHEET);
+  const headers = [["join_id","run_mode","recruitment_source","assignment_id","worker_id","hit_id","created_at","last_seen_at","study_version"]];
+  sheet.getRange(1,1,1,9).setValues(headers);
+  return sheet;
+}
+
+function handleBridgeStart_(ss, data) {
+  const joinId = String(data.join_id || "").trim();
+  const runMode = String(data.run_mode || "").trim();
+  const source = String(data.recruitment_source || "").trim();
+  if (!joinId) throw new Error("Missing bridge join_id");
+  if (["production","internal","preview"].indexOf(runMode) < 0) throw new Error("Invalid run_mode");
+  if (["mturk","internal_test","mturk_preview"].indexOf(source) < 0) throw new Error("Invalid recruitment_source");
+
+  const sheet = ensureBridgeSheet_(ss);
+  const now = new Date();
+  let row = 0;
+  const last = sheet.getLastRow();
+  if (last >= 2) {
+    const found = sheet.getRange(2,1,last-1,1).createTextFinder(joinId).matchEntireCell(true).findNext();
+    if (found) row = found.getRow();
+  }
+  if (!row) {
+    row = Math.max(2,last+1);
+    sheet.getRange(row,1,1,9).setValues([[
+      joinId, runMode, source, data.assignment_id || "", data.worker_id || "", data.hit_id || "",
+      now, now, data.study_version || STUDY_VERSION
+    ]]);
+  } else {
+    const createdAt = sheet.getRange(row,7).getValue() || now;
+    sheet.getRange(row,1,1,9).setValues([[
+      joinId, runMode, source, data.assignment_id || "", data.worker_id || "", data.hit_id || "",
+      createdAt, now, data.study_version || STUDY_VERSION
+    ]]);
+  }
+  return json_({ok:true,join_id:joinId,run_mode:runMode});
 }
 
 function eventExists_(sheet, eventId) {
@@ -131,12 +182,14 @@ function upsertParticipant_(sheet, d, now) {
   }
   if (!row) {
     row = Math.max(2,last+1);
-    sheet.getRange(row,1,1,19).setValues([[
+    sheet.getRange(row,1,1,21).setValues([[
       d.join_id||"", d.assignment_id||"", d.worker_id||"", d.hit_id||"", d.session_id||"", now, now,
-      "OPENED", "", "", "", "", "", "", d.study_version||"", "", "", "", ""
+      "OPENED", "", "", "", "", "", "", d.study_version||"", "", "", "", "",
+      d.run_mode||"", d.recruitment_source||""
     ]]);
   } else {
     sheet.getRange(row,7).setValue(now);
+    sheet.getRange(row,20,1,2).setValues([[d.run_mode||"", d.recruitment_source||""]]);
   }
 
   const type = String(d.event_type||"");
