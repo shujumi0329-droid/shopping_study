@@ -1,4 +1,4 @@
-import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 
 export const BRIDGE_COOKIE = 'shopping_bridge';
 export const BRIDGE_TTL_SECONDS = 6 * 60 * 60;
@@ -6,14 +6,23 @@ const ALLOWED_MODES = new Set(['production','internal','preview']);
 const ALLOWED_SOURCES = new Set(['mturk','internal_test','mturk_preview']);
 const text = (v, max=200) => String(v ?? '').trim().slice(0,max);
 
-function requireSecret(secret = process.env.BRIDGE_SIGNING_SECRET) {
-  const value = text(secret, 500);
-  if (!value) throw new Error('BRIDGE_SIGNING_SECRET is not configured');
-  return value;
+export function resolveBridgeSecret(secret = process.env.BRIDGE_SIGNING_SECRET) {
+  const configured = text(secret, 500);
+  if (configured) return configured;
+  const projectId = text(process.env.VERCEL_PROJECT_ID, 200);
+  const productionUrl = text(process.env.VERCEL_PROJECT_PRODUCTION_URL, 500);
+  if (projectId && productionUrl) {
+    return createHash('sha256').update(`shopping-bridge-v1|${projectId}|${productionUrl}`).digest('hex');
+  }
+  throw new Error('BRIDGE_SIGNING_SECRET is not configured and Vercel system identity is unavailable');
+}
+
+export function deriveInternalTestToken(secret) {
+  return createHmac('sha256', resolveBridgeSecret(secret)).update('internal-test-v1').digest('hex').slice(0,24);
 }
 
 function hmac(data, secret) {
-  return createHmac('sha256', requireSecret(secret)).update(String(data)).digest();
+  return createHmac('sha256', resolveBridgeSecret(secret)).update(String(data)).digest();
 }
 
 export function deriveProductionJoinId(assignmentId, secret) {
